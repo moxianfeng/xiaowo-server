@@ -7,7 +7,7 @@ import (
 type Home struct {
     gorm.Model `json:"-"`;
     UserID string `gorm:"not null;column:user_id;type:varchar(64);index:idx_user_id" json:"-"`
-    HomeID string `gorm:"not null;column:home_id;type:varchar(64);unique_index:idx_home_id" json:"homeId"`
+    HomeID string `gorm:"not null;column:home_id;type:varchar(64);unique_index:idx_home_id" json:"homeID"`
     Name string `gorm:"not null;column:name;type:varchar(64);" json:"name"`
     City string `gorm:"not null;column:city;type:varchar(64);" json:"city"`
     Province string `gorm:"not null;column:province;type:varchar(64);" json:"province"`

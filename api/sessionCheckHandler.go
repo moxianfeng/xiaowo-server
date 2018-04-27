@@ -3,7 +3,7 @@ package api
 
 import (
     "api"
-    "family/api/model"
+    "xiaowo/api/model"
     "github.com/jinzhu/gorm"
 )
 
@@ -14,13 +14,13 @@ type sessionCheckHandler struct {
 func (self *sessionCheckHandler) PreExecute() (user *model.User, db *gorm.DB, success bool) {
     success = false;
 
-    sessionId, err := self.GetString("sessionId");
+    sessionID, err := self.GetString("sessionID");
     if nil != err {
         self.Response(err);
         return;
     }
 
-    user, err = checkSession(sessionId, self.Debug);
+    user, err = checkSession(sessionID, self.Debug);
     if nil != err {
         self.Response(err);
         return;

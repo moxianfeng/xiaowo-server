@@ -3,12 +3,13 @@ package api
 import (
     _ "github.com/go-sql-driver/mysql"
 
-    "family/api/model"
+    "log"
+    "xiaowo/api/model"
     "github.com/jinzhu/gorm"
 )
 
 const (
-    MYSQL_DSN = "family:familyadmin@tcp(127.0.0.1:3306)/family?charset=utf8&parseTime=True&loc=Local";
+    MYSQL_DSN = "xiaowo:xiaowoadmin@tcp(127.0.0.1:3306)/xiaowo?charset=utf8&parseTime=True&loc=Local";
 )
 
 var _db *gorm.DB;
@@ -49,5 +50,7 @@ func init() {
     db, err := GetDB(false);
     if nil == err {
         db.Debug().Set("gorm:table_options", "ENGINE=InnoDB,DEFAULT CHARACTER SET=utf8").AutoMigrate(model.GetModels()...);
+    } else {
+        log.Print(err);
     }
 }

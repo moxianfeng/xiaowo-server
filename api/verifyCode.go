@@ -7,7 +7,7 @@ import (
     "fmt"
 
     "api"
-    "family/api/model"
+    "xiaowo/api/model"
 )
 
 const (
@@ -34,19 +34,7 @@ func (self *verifyCodeHandler) genCode() string {
 }
 
 func (self *verifyCodeHandler) Execute() {
-    sessionId, err := self.GetString("sessionId");
-    if nil != err {
-        self.Response(err);
-        return;
-    }
-
     phoneNumber, err := self.GetString("phoneNumber");
-    if nil != err {
-        self.Response(err);
-        return;
-    }
-
-    user, err := checkSession(sessionId, self.Debug);
     if nil != err {
         self.Response(err);
         return;
@@ -58,18 +46,11 @@ func (self *verifyCodeHandler) Execute() {
         return;
     }
 
-    var cellPhoneCheck model.User;
-    result := db.Where(&model.User{CellPhone: phoneNumber}).First(&cellPhoneCheck);
-    if !result.RecordNotFound() {
-        self.Response(api.E_DUP_PHONENUMBER.Apply("%s", phoneNumber))
-        return;
-    }
-
     verifyCode := self.genCode();
-    newVerifyCode := model.VerifyCode{UserID: user.UserID, PhoneNumber: phoneNumber, SessionKey: sessionId, VerifyCode: verifyCode};
+    newVerifyCode := model.VerifyCode{PhoneNumber: phoneNumber, VerifyCode: verifyCode};
 
     var verifyCodeObject model.VerifyCode;
-    result = db.Where(&model.VerifyCode{UserID: user.UserID}).First(&verifyCodeObject);
+    result := db.Where(&model.VerifyCode{PhoneNumber: phoneNumber}).First(&verifyCodeObject);
     if result.RecordNotFound() {
         if e = db.Create(&newVerifyCode).Error; nil != e {
             self.Response(api.E_SERVER_ERROR.Apply("%s", e.Error()));

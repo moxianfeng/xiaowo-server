@@ -2,10 +2,8 @@ package api
 
 import (
     "api"
-    "fmt"
-    "net/http"
-    "encoding/json"
-    "family/api/model"
+    "time"
+    "xiaowo/api/model"
     "github.com/google/uuid"
 )
 
@@ -14,11 +12,12 @@ type loginHandler struct {
 }
 
 type userStruct struct {
-    UserId string `json:"userId"`;
+    UserID string `json:"userID"`;
     NickName string `json:"nickName"`;
     AvatarUrl string `json:"avatarUrl"`;
     Gender int `json:"gender"`;
-    SessionId string `json:"sessionId"`;
+    SessionID string `json:"sessionID"`;
+    SessionExpireTo time.Time `json:"sessionExpireTo"`;
     Valid bool `json:"valid"`;
 }
 
@@ -34,26 +33,15 @@ const (
 )
 
 func (self *loginHandler) Execute() {
-    code, err := self.GetString("code");
+    phoneNumber, err := self.GetString("phoneNumber");
     if nil != err {
         self.Response(err);
         return;
     }
-    // https://api.weixin.qq.com/sns/jscode2session?appid=APPID&secret=SECRET&js_code=JSCODE&grant_type=authorization_code
-    url := fmt.Sprintf("%s?appid=%s&secret=%s&js_code=%s&grant_type=authorization_code", WEIXIN_URL, APPID, SECRET, code);
-    resp, e := http.Get(url);
-    if nil != e {
-        self.Response(api.E_NETWORK.Apply("%s", e.Error()));
-        return;
-    }
 
-    defer resp.Body.Close()
-    decoder := json.NewDecoder(resp.Body);
-
-    var wxResp map[string]interface{};
-    e = decoder.Decode(&wxResp);
-    if nil != e {
-        self.Response(api.E_BAD_JSON.Apply("%s", e.Error()));
+    verifyCode, err := self.GetString("verifyCode");
+    if nil != err {
+        self.Response(err);
         return;
     }
 
@@ -63,28 +51,28 @@ func (self *loginHandler) Execute() {
         return;
     }
 
-    unionid, ok := wxResp["unionid"];
-    if !ok {
-        unionid = wxResp["openid"];
-    }
-    unionidStr := unionid.(string);
-
-    sessionkeyStr := wxResp["session_key"].(string)
-
-    var user model.User;
-    result := db.Where(&model.User{UnionID: unionidStr}).First(&user);
+    var verify model.VerifyCode;
+    result := db.Where(&model.VerifyCode{PhoneNumber: phoneNumber, VerifyCode: verifyCode}).First(&verify);
     if result.RecordNotFound() {
-        err = self.GetStruct("userInfo", &user);
-        if nil != err {
-            self.Response(err);
+        if self.Debug && phoneNumber == "11111111111" && verifyCode == "111111" {
+            // debug的时候可以直接输入
+        } else {
+            self.Response(api.E_INVALID_VERIFY_CODE);
             return;
         }
+    } else if result.Error != nil {
+        self.Response(api.E_SERVER_ERROR.Apply("%s", e.Error()));
+        return;
+    }
 
+    // verify code check right
+    var user model.User;
+    result = db.Where(&model.User{PhoneNumber: phoneNumber}).First(&user);
+    if result.RecordNotFound() {
+        // create user;
+        user.PhoneNumber = phoneNumber;
+        user.SessionKey = uuid.New().String();
         user.UserID = uuid.New().String();
-        user.UnionID = unionidStr;
-        user.CellPhone = "";
-        user.SessionKey = sessionkeyStr;
-
         if e = db.Create(&user).Error; nil != e {
             self.Response(api.E_SERVER_ERROR.Apply("%s", e.Error()));
             return;
@@ -93,28 +81,33 @@ func (self *loginHandler) Execute() {
         self.Response(api.E_SERVER_ERROR.Apply("%s", e.Error()));
         return;
     } else {
-        var updateUser model.User;
-        updateUser.ID = user.ID;
-        updateUser.SessionKey = sessionkeyStr;
-        db.Debug().Model(&user).Update("session_key", sessionkeyStr);
+        // check session;
+        now := time.Now();
+        valid := user.UpdatedAt.Add(VALID_SESSION);
+        if !valid.After(now) {
+            // update session key
+            newSessionKey := uuid.New().String();
+            db.Model(&user).Update(model.User{SessionKey: newSessionKey});
+            user.SessionKey = newSessionKey;
+        } else {
+            // update session expire time
+            db.Model(&user).Update(model.User{SessionKey: user.SessionKey});
+        }
     }
 
     res := &loginResponse{
         Response: api.Response{ErrCode: 0, ErrMsg: "Login: ok"},
         User: userStruct {
-            UserId : user.UserID,
+            UserID : user.UserID,
             NickName : user.NickName,
             AvatarUrl : user.AvatarUrl,
             Gender : user.Gender,
-            SessionId : user.SessionKey,
+            SessionID : user.SessionKey,
+            SessionExpireTo: user.UpdatedAt.Add(VALID_SESSION),
             Valid : true,
         },
     };
 
-    // check CellPhone
-    if len(user.CellPhone) == 0 {
-        res.User.Valid = false;
-    }
     self.Response(res);
 }
 

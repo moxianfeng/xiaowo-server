@@ -2,22 +2,22 @@ package api
 
 import (
     "time"
-    "family/api/model"
+    "xiaowo/api/model"
     "api"
 )
 
 const (
-    VALID_SESSION = time.Second * 3600;
+    VALID_SESSION = 30 * 24 * 60 * 60 * time.Second;
 )
 
-func checkSession(sessionId string, debug bool) (*model.User, *api.Error) {
+func checkSession(sessionID string, debug bool) (*model.User, *api.Error) {
     db, err := GetDB(debug);
     if nil != err {
         return nil, api.E_MISS_DB_CONNECTION.Apply("%s", err.Error());
     }
 
     var user model.User;
-    result := db.Where(&model.User{SessionKey: sessionId}).First(&user);
+    result := db.Where(&model.User{SessionKey: sessionID}).First(&user);
     if result.RecordNotFound() {
         return nil, api.E_INVALID_SESSION;
     }
